@@ -47,11 +47,20 @@ export function floorTexture() {
   const c = document.createElement('canvas');
   c.width = c.height = S;
   const g = c.getContext('2d');
-  g.fillStyle = '#060a16';
+  g.fillStyle = '#081020';
+  g.fillRect(0, 0, S, S);
+
+  // A breath of light at the centre, so the middle of the ring never reads
+  // as flat black when the whole frame shrinks to a contact sheet.
+  const heart = g.createRadialGradient(S / 2, S / 2, 10, S / 2, S / 2, S * 0.52);
+  heart.addColorStop(0, 'rgba(64,96,170,0.20)');
+  heart.addColorStop(0.6, 'rgba(40,64,120,0.10)');
+  heart.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = heart;
   g.fillRect(0, 0, S, S);
 
   // Panel grid.
-  g.strokeStyle = 'rgba(70,110,180,0.10)';
+  g.strokeStyle = 'rgba(70,110,180,0.16)';
   g.lineWidth = 1;
   for (let i = 0; i <= 16; i += 1) {
     const p = (i / 16) * S;
@@ -60,18 +69,28 @@ export function floorTexture() {
   }
   // Scattered plating wear.
   for (let i = 0; i < 260; i += 1) {
-    g.fillStyle = `rgba(120,160,220,${0.02 + Math.random() * 0.04})`;
+    g.fillStyle = `rgba(120,160,220,${0.03 + Math.random() * 0.05})`;
     g.fillRect(Math.random() * S, Math.random() * S, 2 + Math.random() * 8, 1 + Math.random() * 3);
   }
   const cx = S / 2, cy = S / 2;
+  // Radial spokes from the centre to each gate: the ring's steering marks.
+  g.strokeStyle = 'rgba(96,160,255,0.13)';
+  g.lineWidth = 2;
+  for (let i = 0; i < 12; i += 1) {
+    const a = (i / 12) * Math.PI * 2;
+    g.beginPath();
+    g.moveTo(cx + Math.cos(a) * S * 0.1, cy + Math.sin(a) * S * 0.1);
+    g.lineTo(cx + Math.cos(a) * S * 0.485, cy + Math.sin(a) * S * 0.485);
+    g.stroke();
+  }
   // Range rings.
-  for (const [r, a] of [[0.32, 0.20], [0.58, 0.16], [0.84, 0.22]]) {
+  for (const [r, a] of [[0.32, 0.34], [0.58, 0.27], [0.84, 0.36]]) {
     g.strokeStyle = `rgba(96,180,255,${a})`;
     g.lineWidth = 3;
     g.beginPath(); g.arc(cx, cy, r * S * 0.5, 0, Math.PI * 2); g.stroke();
   }
   // Gate ticks at the rim (the Hollow enter here).
-  g.strokeStyle = 'rgba(255,90,70,0.35)';
+  g.strokeStyle = 'rgba(255,90,70,0.5)';
   g.lineWidth = 6;
   for (let i = 0; i < 12; i += 1) {
     const a = (i / 12) * Math.PI * 2;
@@ -81,12 +100,12 @@ export function floorTexture() {
     g.stroke();
   }
   // Painted name under the centre.
-  g.fillStyle = 'rgba(150,200,255,0.13)';
+  g.fillStyle = 'rgba(150,200,255,0.22)';
   g.font = '700 44px system-ui, sans-serif';
   g.textAlign = 'center';
   g.fillText("SHEPHERD'S RING", cx, cy + 118);
   g.font = '600 21px system-ui, sans-serif';
-  g.fillStyle = 'rgba(150,200,255,0.10)';
+  g.fillStyle = 'rgba(150,200,255,0.17)';
   g.fillText('KEEP THE LIGHT MOVING', cx, cy + 148);
 
   const tex = new THREE.CanvasTexture(c);

@@ -7,7 +7,7 @@
 // but a hollow that is NOT overwhelmed eats the motes touching it, one by one.
 // A thin swarm is food. A thick swarm is a fire.
 
-import { ARENA_RADIUS, BLOOM, COMBO, DRONE, HUNTERS, STEP, SWARM, hpScale, waveLine, waveRecipe } from './config.js';
+import { ARENA_RADIUS, BLOOM, COMBO, DRONE, HUNTERS, STEP, SUNBLOOM, SWARM, VEILS, hpScale, waveLine, waveRecipe } from './config.js';
 import { makeRng } from './random.js';
 
 const TAU = Math.PI * 2;
@@ -20,9 +20,12 @@ export function createWorld(seed) {
     phase: 'combat', // 'combat' | 'cleared' | 'over'
     wave: 0,
     score: 0,
+    best: 0,
     kills: 0,
     harvested: 0,
     bestCombo: 0,
+    veil: null, // the wave's named condition from VEILS, null on waves 1–2
+    fitted: {}, // overclock id -> times fitted this run (the loadout panel)
     combo: { chain: 0, t: 0, mult: 1 },
     drone: null,
     lure: { x: 0, z: -6 },
@@ -31,7 +34,7 @@ export function createWorld(seed) {
     flareEvery: 0,
     flare: { active: false, x: 0, z: 0, t: 0 },
     flareT: 0,
-    bloom: { active: false, x: 0, z: 0, lifeT: 0, lifeMax: BLOOM.life, inside: 0, respawnT: 1.2 },
+    bloom: { active: false, kind: 'plain', need: BLOOM.need, x: 0, z: 0, lifeT: 0, lifeMax: BLOOM.life, inside: 0, respawnT: 1.2 },
     hunters: [],
     spawnQueue: [],
     spawnT: 0,
@@ -50,6 +53,7 @@ export function createWorld(seed) {
     world.time = 0;
     world.phase = 'combat';
     world.score = 0; world.kills = 0; world.harvested = 0; world.bestCombo = 0;
+    world.veil = null; world.fitted = {};
     world.combo = { chain: 0, t: 0, mult: 1 };
     world.swarm = { lurePull: SWARM.lurePull, maxSpeed: SWARM.maxSpeed };
     world.bloomLifeFactor = 1;
@@ -65,7 +69,7 @@ export function createWorld(seed) {
     world.hunters = [];
     world.moteCount = 0;
     world.addMotes(SWARM.start, 0, 6);
-    world.bloom = { active: false, x: 0, z: 0, lifeT: 0, lifeMax: BLOOM.life, inside: 0, respawnT: 1.4 };
+    world.bloom = { active: false, kind: 'plain', need: BLOOM.need, x: 0, z: 0, lifeT: 0, lifeMax: BLOOM.life, inside: 0, respawnT: 1.4 };
     world.startWave(1);
   };
 
@@ -94,6 +98,9 @@ export function createWorld(seed) {
 
   world.startWave = (n) => {
     world.wave = n;
+    // From wave 3 the dark fights under a veil: one named condition, drawn
+    // fresh, that bends this wave's rules (speed, burn, blooms, trickle).
+    world.veil = n >= 3 ? VEILS[Math.floor(world.rng.next() * VEILS.length)] : null;
     const recipe = waveRecipe(n);
     const queue = [];
     for (const [kind, count] of Object.entries(recipe)) for (let i = 0; i < count; i += 1) queue.push(kind);
@@ -105,7 +112,7 @@ export function createWorld(seed) {
     world.spawnQueue = queue;
     world.spawnT = 1.0;
     world.phase = 'combat';
-    world.emit('wave', { wave: n, line: waveLine(n), boss: recipe.undershepherd > 0 });
+    world.emit('wave', { wave: n, line: waveLine(n), boss: recipe.undershepherd > 0, veil: world.veil });
   };
 
   function spawnHunter(kind) {
@@ -122,6 +129,7 @@ export function createWorld(seed) {
       kind, def, x, z, vx: 0, vz: 0,
       hp, hpMax: hp, eatT: world.rng.range(0.2, 0.8), stunT: 0, flash: 0,
       state: 'stalk', stateT: 0, dashX: 0, dashZ: 0, dashT: world.rng.range(1, 2.4),
+      shriekT: world.rng.range(2.5, 4.5),
       phase: world.rng.range(0, TAU), hitT: 0,
     });
     world.emit('spawn', { kind, x, z });
@@ -188,7 +196,7 @@ export function createWorld(seed) {
 
     // --- pulse -----------------------------------------------------------
     if (input.pulse && d.pulseT <= 0 && world.phase === 'combat') {
-      d.pulseT = d.pulseCooldown;
+      d.pulseT = d.pulseCooldown * (world.veil?.pulseFactor ?? 1);
       d.pulseAnim = 1;
       for (const h of world.hunters) {
         const hx = h.x - d.x, hz = h.z - d.z, hd = Math.hypot(hx, hz);
@@ -211,7 +219,7 @@ export function createWorld(seed) {
       world.spawnT -= dt;
       if (world.spawnT <= 0) {
         spawnHunter(world.spawnQueue.shift());
-        world.spawnT = world.wave >= 6 ? 0.8 : 1.05;
+        world.spawnT = (world.wave >= 6 ? 0.8 : 1.05) * (world.veil?.spawnFactor ?? 1);
       }
     } else if (world.hunters.length === 0 && world.phase === 'combat') {
       world.phase = 'cleared';
@@ -305,10 +313,14 @@ export function createWorld(seed) {
           if (Math.hypot(x - world.drone.x, z - world.drone.z) < 11) continue;
           b.x = x; b.z = z; break;
         }
-        b.lifeMax = BLOOM.life * world.bloomLifeFactor;
+        // One bloom in four is a sunbloom: golden, greedier, richer.
+        b.kind = world.rng.chance(SUNBLOOM.chance) ? 'sun' : 'plain';
+        const baseNeed = b.kind === 'sun' ? SUNBLOOM.need : BLOOM.need;
+        b.need = Math.max(8, baseNeed + (world.veil?.bloomNeed ?? 0));
+        b.lifeMax = (b.kind === 'sun' ? SUNBLOOM.life : BLOOM.life) * world.bloomLifeFactor;
         b.lifeT = b.lifeMax;
         b.active = true;
-        world.emit('bloomSpawn', { x: b.x, z: b.z });
+        world.emit('bloomSpawn', { x: b.x, z: b.z, kind: b.kind });
       }
       return;
     }
@@ -318,13 +330,14 @@ export function createWorld(seed) {
       if (Math.hypot(world.mx[i] - b.x, world.mz[i] - b.z) < BLOOM.radius) inside += 1;
     }
     b.inside = inside;
-    if (inside >= BLOOM.need) {
-      const gained = Math.round(BLOOM.score * world.combo.mult);
+    if (inside >= b.need) {
+      const table = b.kind === 'sun' ? SUNBLOOM : BLOOM;
+      const gained = Math.round(table.score * world.combo.mult);
       world.score += gained;
       world.harvested += 1;
       comboLink();
-      world.addMotes(BLOOM.motes, b.x, b.z);
-      world.emit('harvest', { x: b.x, z: b.z, gained });
+      world.addMotes(table.motes, b.x, b.z);
+      world.emit('harvest', { x: b.x, z: b.z, gained, kind: b.kind });
       b.active = false;
       b.respawnT = BLOOM.respawn;
     } else if (b.lifeT <= 0) {
@@ -366,9 +379,9 @@ export function createWorld(seed) {
       const isBoss = h.kind === 'undershepherd';
       h.ring = onIt;
       if (onIt > 0 && (!isBoss || onIt >= overwhelm)) {
-        const factor = h.def.burnFactor ?? 1;
+        const factor = (h.def.burnFactor ?? 1) * (world.veil?.burnFactor ?? 1);
         h.hp -= onIt * SWARM.burnDps * factor * dt;
-        h.flash = Math.min(1, 0.35 + onIt / 30);
+        h.flash = Math.min(1, 0.3 + onIt / 42);
         if (world.rng.chance(dt * 6)) world.emit('burnTick', { x: h.x, z: h.z });
       }
       if (h.hp <= 0) { killHunter(h, hi); continue; }
@@ -390,13 +403,34 @@ export function createWorld(seed) {
       if (world.flare.active) { tx = world.flare.x; tz = world.flare.z; }
       else if (h.def.hunts === 'swarm') { tx = world.centroid.x; tz = world.centroid.z; }
 
+      const veilSpeed = world.veil?.hunterSpeed ?? 1;
       if (h.stunT > 0) {
         h.stunT -= dt;
         h.vx *= 1 - Math.min(1, dt * 6); h.vz *= 1 - Math.min(1, dt * 6);
+      } else if (h.kind === 'wailer') {
+        // The Wailer drifts at the swarm and periodically shrieks: a radial
+        // blast that scatters every mote in reach, breaking the river open.
+        steer(h, tx, tz, h.def.speed * veilSpeed, dt);
+        h.shriekT -= dt;
+        h.state = h.shriekT < 0.8 ? 'telegraph' : 'stalk';
+        if (h.shriekT <= 0) {
+          h.shriekT = h.def.shriekEvery * world.rng.range(0.9, 1.15);
+          let scattered = 0;
+          for (let i = 0; i < world.moteCount; i += 1) {
+            const ox = world.mx[i] - h.x, oz = world.mz[i] - h.z;
+            const dd = Math.hypot(ox, oz);
+            if (dd < h.def.shriekRadius && dd > 0.01) {
+              const push = h.def.shriekForce * (1 - (dd / h.def.shriekRadius) * 0.45);
+              world.mvx[i] += (ox / dd) * push; world.mvz[i] += (oz / dd) * push;
+              scattered += 1;
+            }
+          }
+          if (scattered > 0) world.emit('shriek', { x: h.x, z: h.z, radius: h.def.shriekRadius, scattered });
+        }
       } else if (h.kind === 'charger') {
         h.stateT -= dt;
         if (h.state === 'stalk') {
-          steer(h, tx, tz, h.def.speed, dt);
+          steer(h, tx, tz, h.def.speed * veilSpeed, dt);
           h.dashT -= dt;
           if (h.dashT <= 0 && Math.hypot(tx - h.x, tz - h.z) < 17) { h.state = 'telegraph'; h.stateT = h.def.telegraph; }
         } else if (h.state === 'telegraph') {
@@ -408,11 +442,11 @@ export function createWorld(seed) {
             world.emit('charge', { x: h.x, z: h.z });
           }
         } else if (h.state === 'dash') {
-          h.vx = h.dashX * h.def.dashSpeed; h.vz = h.dashZ * h.def.dashSpeed;
+          h.vx = h.dashX * h.def.dashSpeed * veilSpeed; h.vz = h.dashZ * h.def.dashSpeed * veilSpeed;
           if (h.stateT <= 0) { h.state = 'stalk'; h.dashT = h.def.dashEvery; }
         }
       } else {
-        steer(h, tx, tz, h.def.speed, dt);
+        steer(h, tx, tz, h.def.speed * veilSpeed, dt);
       }
       // Soft separation from other hunters.
       for (const o of world.hunters) {
@@ -439,6 +473,7 @@ export function createWorld(seed) {
         if (d.hp <= 0) {
           d.hp = 0;
           world.phase = 'over';
+          if (world.score > world.best) world.best = world.score;
           world.emit('gameOver', { score: world.score, wave: world.wave });
         }
       }

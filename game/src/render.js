@@ -8,16 +8,24 @@ import * as THREE from 'three';
 import { ARENA_RADIUS, BLOOM, SWARM } from './config.js';
 import { eyeTexture, floorTexture, glowTexture } from './textures.js';
 
-const TRAIL = 6; // ghost points per mote
+const TRAIL = 8; // ghost points per mote
 const MAX_PARTICLES = 700;
 
+/** Each kind's silhouette: no two Hollow read alike at a glance. */
 const HUNTER_GEO = {
   stalker: () => new THREE.OctahedronGeometry(1.0),
   maw: () => new THREE.IcosahedronGeometry(1.45, 1),
-  brood: () => new THREE.IcosahedronGeometry(1.5, 1),
+  brood: () => new THREE.IcosahedronGeometry(1.5, 0),
   mite: () => new THREE.TetrahedronGeometry(0.66),
   charger: () => new THREE.ConeGeometry(0.82, 2.7, 4),
+  wailer: () => new THREE.TorusGeometry(1.02, 0.42, 10, 5),
   undershepherd: () => new THREE.IcosahedronGeometry(3.1, 1),
+};
+
+/** The coloured dread-light pooling under each kind (matches the manifest). */
+const UNDER_GLOW = {
+  stalker: 0x901818, maw: 0xa83c10, brood: 0x5a1890, mite: 0x901850,
+  charger: 0xb02020, wailer: 0x0f6a72, undershepherd: 0xa01818,
 };
 
 export function createRender(canvas, world) {
@@ -66,6 +74,42 @@ export function createRender(canvas, world) {
     gate.rotation.y = -a + Math.PI / 2;
     scene.add(gate);
   }
+
+  // Standing stones inside the rim: old shepherd-markers, each capped with a
+  // faint gold rune-band, so the ring has landmarks the eye can steer by.
+  const stoneMat = new THREE.MeshStandardMaterial({ color: 0x131c30, roughness: 0.85, metalness: 0.15, flatShading: true });
+  const runeMat = new THREE.MeshStandardMaterial({ color: 0x2a1c05, emissive: 0xffb84d, emissiveIntensity: 0.55, roughness: 0.5 });
+  const stoneGeo = new THREE.BoxGeometry(1.1, 3.4, 0.8);
+  const runeGeo = new THREE.BoxGeometry(1.14, 0.28, 0.84);
+  for (let i = 0; i < 8; i += 1) {
+    const a = (i / 8) * Math.PI * 2 + 0.39;
+    const stone = new THREE.Mesh(stoneGeo, stoneMat);
+    stone.position.set(Math.cos(a) * (ARENA_RADIUS - 4.6), 1.7, Math.sin(a) * (ARENA_RADIUS - 4.6));
+    stone.rotation.y = -a + Math.PI / 2;
+    stone.rotation.z = (i % 3 - 1) * 0.045;
+    const rune = new THREE.Mesh(runeGeo, runeMat);
+    rune.position.y = 1.05;
+    stone.add(rune);
+    scene.add(stone);
+  }
+
+  // Ambient dust: two hundred motes of plain night air, drifting slowly, so
+  // the dark between the lights has depth instead of flat black.
+  const DUST = 220;
+  const dustGeo = new THREE.BufferGeometry();
+  const dustPos = new Float32Array(DUST * 3);
+  const dustSeed = new Float32Array(DUST);
+  for (let i = 0; i < DUST; i += 1) {
+    const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * (ARENA_RADIUS + 6);
+    dustPos[i * 3] = Math.cos(a) * r;
+    dustPos[i * 3 + 1] = 0.4 + Math.random() * 5.5;
+    dustPos[i * 3 + 2] = Math.sin(a) * r;
+    dustSeed[i] = Math.random() * Math.PI * 2;
+  }
+  dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+  const dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({ size: 0.32, map: glowTex, color: 0x5a76b8, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false }));
+  dust.frustumCulled = false;
+  scene.add(dust);
 
   // --- the shepherd -------------------------------------------------------
   const droneGroup = new THREE.Group();
@@ -121,8 +165,8 @@ export function createRender(canvas, world) {
     scene.add(points);
     return points;
   }
-  const heads = makePoints(SWARM.max, 1.55, 0.95);
-  const ghosts = makePoints(SWARM.max * TRAIL, 1.2, 0.55);
+  const heads = makePoints(SWARM.max, 1.85, 0.95);
+  const ghosts = makePoints(SWARM.max * TRAIL, 1.45, 0.72);
   const history = new Float32Array(SWARM.max * TRAIL * 2); // x,z per ghost slot
   let histTick = 0;
 
@@ -135,17 +179,21 @@ export function createRender(canvas, world) {
     body.position.y = h.def.radius + 0.35;
     if (h.kind === 'stalker') body.scale.set(1, 1.35, 1);
     if (h.kind === 'charger') { body.rotation.x = Math.PI / 2; body.position.y = 1.2; }
+    if (h.kind === 'wailer') { body.rotation.x = Math.PI / 2; body.position.y = 1.5; }
     group.add(body);
     const eye = new THREE.Sprite(new THREE.SpriteMaterial({ map: eyeTex, color: 0xffffff, transparent: true, depthWrite: false, depthTest: false }));
     eye.renderOrder = 5;
-    const eyeScale = h.kind === 'undershepherd' ? 2.6 : h.kind === 'maw' ? 1.7 : 1.0;
+    const eyeScale = h.kind === 'undershepherd' ? 2.6 : h.kind === 'maw' ? 1.7 : h.kind === 'wailer' ? 1.35 : 1.1;
     eye.scale.setScalar(eyeScale);
     eye.position.y = h.def.radius + 0.55;
     group.add(eye);
-    const under = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0x901818, transparent: true, opacity: 0.32, blending: THREE.AdditiveBlending, depthWrite: false }));
+    const under = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: UNDER_GLOW[h.kind] ?? 0x901818, transparent: true, opacity: 0.34, blending: THREE.AdditiveBlending, depthWrite: false }));
     under.scale.setScalar(h.def.radius * 3.4);
     under.position.y = 0.25;
     group.add(under);
+    // (No point light of its own for the boss: its dread-light sprite, eye
+    // and ember flash carry it, and one fewer light keeps every standard
+    // material in the scene cheaper to shade.)
     let shards = null;
     if (h.kind === 'undershepherd') {
       shards = new THREE.Group();
@@ -183,6 +231,13 @@ export function createRender(canvas, world) {
   const bloomLight = new THREE.PointLight(0x7dff9a, 120, 22, 1.9);
   bloomLight.position.y = 2.2;
   bloomGroup.add(bloomLight);
+  // A pillar of light over the ring, so a bloom calls from across the arena.
+  const bloomPillar = new THREE.Mesh(
+    new THREE.CylinderGeometry(BLOOM.radius * 0.92, BLOOM.radius * 0.92, 8, 40, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0x8dff9e, transparent: true, opacity: 0.09, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }),
+  );
+  bloomPillar.position.y = 4;
+  bloomGroup.add(bloomPillar);
   bloomGroup.visible = false;
   scene.add(bloomGroup);
 
@@ -221,6 +276,7 @@ export function createRender(canvas, world) {
     else if (type === 'eaten') burst(data.x, data.z, { count: 5, color: [0.55, 0.65, 1], speed: 3.5, life: 0.5, up: 2.5 });
     else if (type === 'harvest') { burst(data.x, data.z, { count: 42, color: [0.55, 1, 0.6], speed: 10, life: 1, up: 10 }); pulseRing(data.x, data.z, BLOOM.radius + 2.5, 0x8dff9e); }
     else if (type === 'pulse') { pulseRing(data.x, data.z, data.radius, 0xffd98a); shake = Math.max(shake, 0.25); }
+    else if (type === 'shriek') { pulseRing(data.x, data.z, data.radius, 0x39d0d8); burst(data.x, data.z, { count: 14, color: [0.25, 0.85, 0.9], speed: 12, life: 0.5, up: 4 }); shake = Math.max(shake, 0.3); }
     else if (type === 'hurt') { shake = Math.max(shake, 0.55); burst(data.x, data.z, { count: 10, color: [1, 0.3, 0.2], speed: 7, life: 0.5 }); }
     else if (type === 'bossDown') { burst(data.x, data.z, { count: 90, color: [1, 0.7, 0.3], speed: 16, life: 1.3, up: 11 }); shake = Math.max(shake, 0.8); }
     else if (type === 'spawn') burst(data.x, data.z, { count: 6, color: [0.9, 0.25, 0.2], speed: 4, life: 0.5, up: 3 });
@@ -294,18 +350,34 @@ export function createRender(canvas, world) {
           u.eye.scale.setScalar(u.eyeScale * (1.5 + Math.sin(t * 30) * 0.25));
         } else u.eye.scale.setScalar(u.eyeScale);
       }
+      if (h.kind === 'wailer') {
+        u.body.rotation.z = t * 1.1;
+        // The shriek gathers: the eye swells and the ring shivers first.
+        if (h.state === 'telegraph') {
+          group.position.x += (Math.random() - 0.5) * 0.1;
+          group.position.z += (Math.random() - 0.5) * 0.1;
+          u.eye.scale.setScalar(u.eyeScale * (1.6 + Math.sin(t * 26) * 0.3));
+        } else u.eye.scale.setScalar(u.eyeScale);
+      }
       if (u.shards) u.shards.rotation.y = t * 0.8;
       // Burn flash: embers in the cracks of the shell, never a full glow —
-      // a burning hollow stays a dark shape with fire inside it.
-      const f = Math.max(0, Math.min(1, h.flash));
-      u.mat.emissive.setRGB(f * 0.55, f * 0.2, f * 0.03);
-      u.mat.color.setRGB(0.02 + f * 0.1, 0.03 + f * 0.04, 0.05);
+      // a burning hollow stays a dark shape with fire inside it. The level
+      // is kept low and it flickers, so even the Undershepherd at full burn
+      // reads as a black mass with a living ember light, not a lit disc.
+      const f = Math.max(0, Math.min(1, h.flash)) * (0.78 + 0.22 * Math.sin(t * 23 + h.phase * 7));
+      // The Undershepherd shades darker than its brood: at its size the
+      // shepherd's own light would otherwise wash it tan, and it should
+      // read as the blackest mass on the field, known by its eye.
+      const tone = h.kind === 'undershepherd' ? 0.5 : 1;
+      u.mat.emissive.setRGB(f * 0.21 * tone, f * 0.07 * tone, f * 0.013 * tone);
+      u.mat.color.setRGB((0.02 + f * 0.05) * tone, (0.03 + f * 0.02) * tone, 0.05 * tone);
     }
     for (const [h, group] of hunterMeshes) {
       if (!seen.has(h)) { scene.remove(group); hunterMeshes.delete(h); }
     }
 
-    // Bloom.
+    // Bloom. A plain bloom is green and hurries as it fades; a sunbloom is
+    // gold the whole of its longer life, with a taller pillar.
     const b = world.bloom;
     bloomGroup.visible = b.active;
     if (b.active) {
@@ -313,9 +385,16 @@ export function createRender(canvas, world) {
       const frac = Math.max(0, b.lifeT / b.lifeMax);
       const urgency = 1 + Math.sin(t * (2 + (1 - frac) * 6)) * 0.05;
       bloomRingMesh.scale.setScalar(urgency * (0.4 + frac * 0.6));
-      bloomRingMesh.material.color.setHSL(0.36 - (1 - frac) * 0.22, 1, 0.65);
-      bloomDisc.material.opacity = 0.16 + (b.inside / BLOOM.need) * 0.38;
+      const sun = b.kind === 'sun';
+      if (sun) bloomRingMesh.material.color.setHex(0xffd34d);
+      else bloomRingMesh.material.color.setHSL(0.36 - (1 - frac) * 0.22, 1, 0.65);
+      bloomDisc.material.color.setHex(sun ? 0xae8a3f : 0x3fae5f);
+      bloomDisc.material.opacity = 0.16 + (b.inside / b.need) * 0.38;
+      bloomLight.color.setHex(sun ? 0xffd34d : 0x7dff9a);
       bloomLight.intensity = 120 + b.inside * 9;
+      bloomPillar.material.color.setHex(sun ? 0xffd34d : 0x8dff9e);
+      bloomPillar.material.opacity = 0.07 + (b.inside / b.need) * 0.08;
+      bloomPillar.scale.y = sun ? 1.5 : 1;
     }
 
     // Flare.
@@ -353,6 +432,14 @@ export function createRender(canvas, world) {
       r.m.material.opacity = Math.max(0, 0.8 * (1 - r.t));
       if (r.t >= 1) { scene.remove(r.m); r.m.material.dispose(); rings.splice(i, 1); }
     }
+
+    // Dust drift: a slow sideways breath through the whole arena.
+    const dp = dust.geometry.attributes.position;
+    for (let i = 0; i < DUST; i += 1) {
+      dp.array[i * 3] += Math.sin(t * 0.22 + dustSeed[i]) * dt * 0.55;
+      dp.array[i * 3 + 2] += Math.cos(t * 0.17 + dustSeed[i] * 1.7) * dt * 0.55;
+    }
+    dp.needsUpdate = true;
 
     // Camera: follow the shepherd, leaning toward the lure; shake on hits.
     const fx = d.x * 0.74 + world.lure.x * 0.26;

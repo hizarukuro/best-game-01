@@ -4,7 +4,7 @@
 // through the bloom), so each frame is a moment a real run produces — the
 // same seed always lands on the same frame.
 
-import { BLOOM, HUNTERS } from './config.js';
+import { BLOOM, SUNBLOOM, UPGRADES } from './config.js';
 
 function nearestHunter(world, x, z) {
   let best = null, bd = Infinity;
@@ -77,42 +77,67 @@ export function createStaging(name, world, seed) {
   let steps = 0;
 
   if (name === 'cover') {
-    // A wave-6 fight at its thickest: the river bent around the shepherd,
-    // two kinds of Hollow burning inside the curve, a bloom open nearby.
-    world.startWave(6); // the real wave call, so the banner and feed name it right
+    // The wave-10 boss fight at its thickest — the frame the whole entry is
+    // judged by. Real systems only, staged the way a real run reaches them:
+    // four overclocks fitted across nine cleared waves (the real apply
+    // functions, so the loadout panel and the sim agree), the Undershepherd
+    // on the field with its escort, a sunbloom open across the ring, and the
+    // shepherd kiting the boss with the whole river wrapped around it —
+    // the one way the boss burns at all.
+    const fit = (id) => {
+      const u = UPGRADES.find((x) => x.id === id);
+      u.apply(world);
+      world.fitted[id] = (world.fitted[id] ?? 0) + 1;
+    };
+    world.startWave(10); // the real wave call: banner, feed and veil name it right
     world.spawnQueue.length = 0;
     world.hunters.length = 0;
-    world.drone.hp = 74;
-    world.score = 12480;
-    world.combo.chain = 13; world.combo.t = 3; world.combo.mult = 1 + 13 * 0.25;
-    world.addMotes(24, 0, 6);
-    world.spawnAt('stalker', 8, 1);
-    world.spawnAt('stalker', -7, -9);
-    world.spawnAt('stalker', 13, -3);
-    world.spawnAt('maw', -12, 5);
-    world.spawnAt('maw', 5, 13);
-    world.spawnAt('brood', -3, -16);
-    world.spawnAt('charger', 16, 9);
+    fit('sparks'); fit('sparks'); fit('pull'); fit('signal'); fit('pulse');
+    world.drone.hp = 63;
+    world.score = 21340;
+    world.best = 26915;
+    world.kills = 87;
+    world.harvested = 11;
+    world.combo.chain = 17; world.combo.t = 3; world.combo.mult = 1 + 17 * 0.25;
+    world.spawnAt('undershepherd', 11, -7);
+    world.spawnAt('maw', -10, 6);
+    world.spawnAt('wailer', 15, 9);
+    world.spawnAt('charger', -15, -9);
+    world.spawnAt('stalker', 4, 14);
+    world.spawnAt('mite', 8, 10);
     world.bloom.active = true;
-    world.bloom.x = 13; world.bloom.z = -10;
-    world.bloom.lifeMax = BLOOM.life; world.bloom.lifeT = 15;
-    // Two beats: the fight knots around a hunter; then the shepherd breaks
-    // off and leads the whole river across the arena into the bloom, so the
-    // frozen frame catches the swarm mid-crossing — a long curve of light
-    // with the Hollow streaming after it.
+    world.bloom.kind = 'sun';
+    world.bloom.need = SUNBLOOM.need;
+    world.bloom.x = -13; world.bloom.z = -12;
+    world.bloom.lifeMax = SUNBLOOM.life; world.bloom.lifeT = 17;
+    // Shepherd the boss: hold ~11 units off it and circle, with the lure
+    // set on the boss's near shoulder — so the river streams out behind the
+    // shepherd in a long arc, wraps the boss's flank, and burns it, instead
+    // of vanishing into a knot inside the boss's silhouette. One pulse
+    // mid-scene so the ring is still in the air when the frame freezes.
     let n = 0;
     return {
       input: () => {
         n += 1;
-        if (n < 92) return autopilot(world);
-        const d = world.drone, b = world.bloom;
+        const d = world.drone;
+        const boss = world.hunters.find((h) => h.kind === 'undershepherd') ?? nearestHunter(world, d.x, d.z);
+        if (!boss) return autopilot(world);
+        const dx = d.x - boss.x, dz = d.z - boss.z;
+        const dist = Math.max(1, Math.hypot(dx, dz));
+        const radial = (11 - dist) * 0.22;
+        let mx = (dx / dist) * radial + (-dz / dist) * 0.9;
+        let mz = (dz / dist) * radial + (dx / dist) * 0.9;
+        const ml = Math.hypot(mx, mz);
+        if (ml > 1) { mx /= ml; mz /= ml; }
         return {
-          mx: (b.x - d.x) * 0.09, mz: (b.z - d.z) * 0.09,
-          aimX: b.x, aimZ: b.z,
-          pulse: false,
+          mx, mz,
+          aimX: boss.x + (dx / dist) * 2.8, aimZ: boss.z + (dz / dist) * 2.8,
+          pulse: n === 132 && d.pulseT <= 0,
         };
       },
-      get done() { steps += 1; return steps > 152; },
+      // 170 steps ≈ 2.8 s: inside the combo's 3 s window, so the staged
+      // chain is still alive — and still paying — in the frozen frame.
+      get done() { steps += 1; return steps > 170; },
     };
   }
 
@@ -130,7 +155,18 @@ export function createStaging(name, world, seed) {
   }
 
   if (name === 'over') {
-    // A shepherd who stayed too long: no steering, no pulse, three Stalkers.
+    // A shepherd who stayed too long, six waves in: the tally of a real run
+    // (score, kills, harvests, best chain) stands in the world, and then
+    // three Stalkers finish the last of the hull while the shepherd holds
+    // still — no steering, no pulse.
+    world.startWave(6);
+    world.spawnQueue.length = 0;
+    world.hunters.length = 0;
+    world.score = 8640;
+    world.kills = 23;
+    world.harvested = 5;
+    world.bestCombo = 14;
+    world.best = 11230;
     world.drone.hp = 12;
     world.spawnAt('stalker', 3.5, 3);
     world.spawnAt('stalker', -3, 4.5);

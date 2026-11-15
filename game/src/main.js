@@ -17,6 +17,7 @@ const SHOT = params.get('shot');
 const canvas = document.getElementById('game');
 
 const world = createWorld(1);
+try { world.best = parseInt(localStorage.getItem('lurelight-best') ?? '0', 10) || 0; } catch { world.best = 0; }
 const render = createRender(canvas, world);
 const audio = createAudio();
 const input = createInput(canvas);
@@ -36,6 +37,7 @@ const hud = createHud({ onUpgrade: (u) => upgradePick(u) });
 function upgradePick(u) {
   if (state !== 'upgrade') return;
   u.apply(world);
+  world.fitted[u.id] = (world.fitted[u.id] ?? 0) + 1; // the loadout panel reads this
   audio.upgrade();
   hud.hideUpgrade();
   hud.feed(`${u.name.toUpperCase()} FITTED`, 'good');
@@ -58,8 +60,11 @@ world.emit = (type, data) => {
   if (type === 'wave') {
     audio.wave();
     if (data.boss) audio.boss();
-    hud.banner(data.line, data.boss ? 'IT BURNS ONLY WHEN THE WHOLE RIVER HOLDS IT' : '');
+    hud.banner(data.line, data.boss
+      ? 'IT BURNS ONLY WHEN THE WHOLE RIVER HOLDS IT'
+      : (data.veil ? `VEIL — ${data.veil.name}: ${data.veil.desc.toUpperCase()}` : ''));
     hud.feed(data.line, data.boss ? 'bad' : '');
+    if (data.veil && !data.boss) hud.feed(`VEIL — ${data.veil.name}: ${data.veil.desc}`, 'good');
   } else if (type === 'waveClear') {
     hud.banner(`WAVE ${data.wave} CLEARED`, 'CHOOSE AN OVERCLOCK');
     if (!SHOT && state === 'playing') {
@@ -67,9 +72,10 @@ world.emit = (type, data) => {
     }
   } else if (type === 'harvest') {
     audio.harvest();
-    hud.feed(`BLOOM HARVESTED +${data.gained} · +4 MOTES`, 'good');
-  } else if (type === 'bloomSpawn') hud.feed('A BLOOM OPENS');
+    hud.feed(data.kind === 'sun' ? `SUNBLOOM HARVESTED +${data.gained} · +8 MOTES` : `BLOOM HARVESTED +${data.gained} · +4 MOTES`, 'good');
+  } else if (type === 'bloomSpawn') hud.feed(data.kind === 'sun' ? 'A SUNBLOOM OPENS — RICHER LIGHT' : 'A BLOOM OPENS', data.kind === 'sun' ? 'good' : '');
   else if (type === 'bloomFade') hud.feed('THE BLOOM WITHERS', 'bad');
+  else if (type === 'shriek') { audio.shriek(); if (throttled('shriek', 2000)) hud.feed('THE WAILER SHRIEKS — THE RIVER SCATTERS', 'bad'); }
   else if (type === 'burnDeath') {
     audio.burn();
     if (data.kind === 'undershepherd') hud.banner('THE UNDERSHEPHERD BURNS', `+${data.gained}`);
@@ -80,6 +86,7 @@ world.emit = (type, data) => {
   else if (type === 'flare') hud.feed('DECOY FLARE LIT', 'good');
   else if (type === 'gameOver') {
     audio.over();
+    try { localStorage.setItem('lurelight-best', String(world.best)); } catch { /* private mode: the session best still stands */ }
     if (!SHOT) setTimeout(() => { if (world.phase === 'over') { state = 'over'; hud.showOver(world); } }, 1000);
   }
 };
@@ -132,6 +139,7 @@ if (SHOT) {
   render.update(STEP);
   if (SHOT === 'start') hud.showTitle();
   if (SHOT === 'upgrade') dealUpgrades();
+  if (SHOT === 'cover') hud.clearBanner(); // the boss bar + directive carry the same facts, without crossing the panels
   if (SHOT === 'over') { hud.clearBanner(); hud.showOver(world); }
   window.__shotReady = true;
   if (params.get('live') === '1') liveStaging = staging;
@@ -182,7 +190,7 @@ function frame(now) {
   hud.update(world, dt);
   if (world.bloom.active) {
     const p = render.project(world.bloom.x, world.bloom.z);
-    hud.setBloomTag(p.x, p.y, !p.behind, world.bloom.inside);
-  } else hud.setBloomTag(0, 0, false, 0);
+    hud.setBloomTag(p.x, p.y, !p.behind, world.bloom);
+  } else hud.setBloomTag(0, 0, false, world.bloom);
 }
 requestAnimationFrame(frame);
