@@ -88,6 +88,8 @@ export function createAudio() {
     upgrade() { [392, 523.25, 659.25, 783.99].forEach((f, i) => tone({ freq: f, type: 'triangle', dur: 0.3, vol: 0.1, delay: i * 0.06 })); },
     /** The Undershepherd enters. */
     boss() { tone({ freq: 65, freqEnd: 41, type: 'sawtooth', dur: 1.1, vol: 0.22 }); tone({ freq: 130, freqEnd: 82, type: 'sawtooth', dur: 1.1, vol: 0.1, delay: 0.05 }); },
+    /** The Wailer shrieks: a glassy rising wail that tears off at the top. */
+    shriek() { tone({ freq: 340, freqEnd: 1560, type: 'sine', dur: 0.5, vol: 0.13 }); tone({ freq: 512, freqEnd: 2100, type: 'triangle', dur: 0.42, vol: 0.06, delay: 0.04 }); noise({ dur: 0.3, vol: 0.07, freq: 3400, q: 2 }); },
     /** The light goes out. */
     over() { tone({ freq: 330, freqEnd: 55, type: 'triangle', dur: 1.4, vol: 0.2 }); },
     stop() { if (musicTimer) clearInterval(musicTimer); musicTimer = null; },

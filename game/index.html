@@ -35,16 +35,39 @@
   #swarm-line b { color: var(--gold); font-family: var(--font-readout); font-size: 17px; margin-left: 4px; }
   #centre-cluster { text-align: center; min-width: 0; background: none; border: none; padding-top: 2px; }
   #wave-label { font-family: var(--font-readout); font-size: 21px; letter-spacing: 0.22em; color: var(--ink); text-shadow: 0 2px 14px rgba(0,0,0,0.8); }
+  #objective { margin-top: 5px; font-size: 10.5px; letter-spacing: 0.2em; color: var(--gold-soft); text-shadow: 0 2px 10px rgba(0,0,0,0.9); white-space: nowrap; }
+  #directive { margin-top: 3px; font-family: var(--font-readout); font-size: 11.5px; letter-spacing: 0.1em; color: #cfe0ff; text-shadow: 0 2px 10px rgba(0,0,0,0.9); white-space: nowrap; }
   #boss-wrap { width: 340px; max-width: 44vw; margin: 8px auto 0; opacity: 0; transition: opacity 0.4s; }
   #boss-wrap .label { font-size: 9.5px; letter-spacing: 0.24em; color: #ff8a7a; text-align: center; }
   #boss-bar { height: 7px; background: rgba(255, 60, 40, 0.15); border: 1px solid rgba(255, 90, 70, 0.35); border-radius: 4px; margin-top: 4px; overflow: hidden; }
   #boss-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #c22e1f, #ff5d47); transition: width 0.2s; }
+  #boss-sub { margin-top: 4px; font-size: 9.5px; letter-spacing: 0.18em; color: #ffb0a2; text-align: center; }
   #score-cluster { text-align: right; }
   #score-num { font-family: var(--font-readout); font-size: 24px; color: var(--gold-soft); }
+  #best-line { font-size: 10px; letter-spacing: 0.16em; color: var(--muted); margin-top: 2px; }
+  #best-line b { color: var(--ink); font-family: var(--font-readout); font-weight: 600; }
   #combo-wrap { margin-top: 4px; transition: opacity 0.3s; }
   #combo-mult { font-family: var(--font-readout); font-size: 15px; color: var(--bloom); }
   #combo-bar { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-top: 3px; overflow: hidden; }
   #combo-fill { height: 100%; background: var(--bloom); width: 100%; }
+  #combo-note { margin-top: 4px; font-size: 9px; letter-spacing: 0.12em; color: var(--muted); }
+
+  /* ---------- side panels: the Hollow manifest + fitted overclocks ---------- */
+  .side-panel { position: fixed; top: 128px; width: 224px; background: var(--panel); border: 1px solid var(--hairline); border-radius: 8px; padding: 9px 12px; pointer-events: none; }
+  .side-panel .panel-title { font-size: 9.5px; letter-spacing: 0.2em; color: var(--muted); display: flex; justify-content: space-between; }
+  .side-panel .panel-title b { color: var(--ink); font-family: var(--font-readout); font-weight: 600; letter-spacing: 0.04em; }
+  #manifest { right: 18px; }
+  .hunter-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 7px; margin-top: 7px; font-size: 12px; }
+  .hunter-dot { width: 8px; height: 8px; border-radius: 2px; transform: rotate(45deg); flex: none; position: relative; top: 1px; }
+  .hunter-name { font-weight: 700; letter-spacing: 0.03em; }
+  .hunter-count { font-family: var(--font-readout); color: var(--gold-soft); margin-left: auto; font-size: 13px; }
+  .hunter-trait { flex-basis: 100%; margin: -2px 0 0 15px; font-size: 10px; color: var(--muted); letter-spacing: 0.04em; }
+  .panel-foot { margin-top: 9px; padding-top: 7px; border-top: 1px solid var(--hairline); font-size: 10px; line-height: 1.55; color: var(--muted); letter-spacing: 0.05em; }
+  .panel-foot b { color: var(--gold-soft); font-weight: 700; }
+  .panel-empty { margin-top: 6px; font-size: 11px; color: var(--muted); letter-spacing: 0.05em; }
+  #loadout { left: 18px; }
+  .chip { display: inline-block; margin: 6px 5px 0 0; border: 1px solid rgba(255, 196, 77, 0.45); border-radius: 20px; padding: 3px 9px; font-size: 10.5px; letter-spacing: 0.05em; color: var(--gold-soft); background: rgba(30, 24, 8, 0.55); }
+  .chip b { font-family: var(--font-readout); font-weight: 600; }
 
   /* ---------- feed / pulse / hints ---------- */
   #feed { position: fixed; left: 18px; bottom: 92px; display: grid; gap: 4px; justify-items: start; max-width: 430px; pointer-events: none; }
@@ -107,18 +130,34 @@
   </div>
   <div class="cluster" id="centre-cluster">
     <div id="wave-label">WAVE 1</div>
+    <div id="objective">BURN THE HOLLOW · GROW AT THE BLOOMS · THE LIGHT DIES WITH THE SWARM</div>
+    <div id="directive"></div>
     <div id="boss-wrap">
       <div class="label">THE UNDERSHEPHERD</div>
       <div id="boss-bar"><div id="boss-fill"></div></div>
+      <div id="boss-sub">BURNS ONLY WHILE 18+ MOTES HOLD IT</div>
     </div>
   </div>
   <div class="cluster" id="score-cluster">
     <div class="label" style="justify-content:flex-end"><span>SCORE</span></div>
     <div id="score-num">0</div>
+    <div id="best-line">BEST <b id="best-num">0</b></div>
     <div id="combo-wrap"><span id="combo-mult">×1</span> <span style="font-size:10px; letter-spacing:0.14em; color:var(--muted)">CHAIN</span>
       <div id="combo-bar"><div id="combo-fill"></div></div>
     </div>
+    <div id="combo-note">KILLS + HARVESTS RAISE THE CHAIN — IT PAYS IN SCORE</div>
   </div>
+</div>
+
+<div class="side-panel" id="loadout">
+  <div class="panel-title"><span>OVERCLOCKS FITTED</span><b id="loadout-count">0</b></div>
+  <div id="loadout-chips"><div class="panel-empty">None yet — clear a wave to fit one.</div></div>
+</div>
+
+<div class="side-panel" id="manifest">
+  <div class="panel-title"><span>THE HOLLOW — ON THE FIELD</span><b id="manifest-count">0</b></div>
+  <div id="manifest-rows"><div class="panel-empty">The rim is quiet. It will not stay quiet.</div></div>
+  <div class="panel-foot" id="manifest-foot"></div>
 </div>
 
 <div id="feed"></div>
@@ -147,6 +186,11 @@
     <b>1 · 2 · 3</b><span>choose an overclock between waves</span>
     <b>P</b><span>pause</span>
   </div>
+  <p class="fiction" style="margin-top:16px">THE HOLLOW: <b style="color:#ff5d47">Stalkers</b> hunt the shepherd ·
+  <b style="color:#ff9a3d">Maws</b> eat the swarm · <b style="color:#b07dff">Brood Hollows</b> split into Mites ·
+  <b style="color:#ff3b30">Lancers</b> charge · <b style="color:#39d0d8">Wailers</b> shriek the river apart ·
+  and every fifth wave, <b style="color:#ff2a1a">the Undershepherd</b> comes for its flock.
+  From wave 3, each wave fights under a Veil — a named condition that bends its rules.</p>
   <button class="big-btn" id="start-btn">BEGIN THE VIGIL</button>
 </div>
 
