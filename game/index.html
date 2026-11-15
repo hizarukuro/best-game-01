@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LURELIGHT — you are the shepherd; the swarm is your only weapon</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --ink: #f3ead2;
+    --muted: #9aa7bd;
+    --panel: rgba(8, 12, 24, 0.78);
+    --hairline: rgba(160, 190, 255, 0.16);
+    --gold: #ffc44d;
+    --gold-soft: #ffd98a;
+    --bloom: #8dff9e;
+    --danger: #ff5d47;
+    --font-ui: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-readout: ui-monospace, 'SF Mono', Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #04060e; color: var(--ink); font-family: var(--font-ui); }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+  /* ---------- top cluster ---------- */
+  #topbar { position: fixed; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: flex-start; padding: 14px 18px; pointer-events: none; }
+  .cluster { background: var(--panel); border: 1px solid var(--hairline); border-radius: 8px; padding: 9px 14px; min-width: 218px; }
+  .cluster .label { font-size: 9.5px; letter-spacing: 0.18em; color: var(--muted); display: flex; justify-content: space-between; gap: 18px; }
+  .cluster .label b { color: var(--ink); font-family: var(--font-readout); font-weight: 600; letter-spacing: 0; }
+  #hull-bar { height: 9px; background: rgba(255,255,255,0.09); border-radius: 4px; margin-top: 6px; overflow: hidden; }
+  #hull-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #ffb84d, #ffe1a0); border-radius: 4px; transition: width 0.18s; }
+  #hull-fill.low { background: linear-gradient(90deg, #ff5d47, #ff9a5d); }
+  #swarm-line { margin-top: 8px; font-size: 12px; color: var(--muted); letter-spacing: 0.08em; }
+  #swarm-line b { color: var(--gold); font-family: var(--font-readout); font-size: 17px; margin-left: 4px; }
+  #centre-cluster { text-align: center; min-width: 0; background: none; border: none; padding-top: 2px; }
+  #wave-label { font-family: var(--font-readout); font-size: 21px; letter-spacing: 0.22em; color: var(--ink); text-shadow: 0 2px 14px rgba(0,0,0,0.8); }
+  #boss-wrap { width: 340px; max-width: 44vw; margin: 8px auto 0; opacity: 0; transition: opacity 0.4s; }
+  #boss-wrap .label { font-size: 9.5px; letter-spacing: 0.24em; color: #ff8a7a; text-align: center; }
+  #boss-bar { height: 7px; background: rgba(255, 60, 40, 0.15); border: 1px solid rgba(255, 90, 70, 0.35); border-radius: 4px; margin-top: 4px; overflow: hidden; }
+  #boss-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #c22e1f, #ff5d47); transition: width 0.2s; }
+  #score-cluster { text-align: right; }
+  #score-num { font-family: var(--font-readout); font-size: 24px; color: var(--gold-soft); }
+  #combo-wrap { margin-top: 4px; transition: opacity 0.3s; }
+  #combo-mult { font-family: var(--font-readout); font-size: 15px; color: var(--bloom); }
+  #combo-bar { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-top: 3px; overflow: hidden; }
+  #combo-fill { height: 100%; background: var(--bloom); width: 100%; }
+
+  /* ---------- feed / pulse / hints ---------- */
+  #feed { position: fixed; left: 18px; bottom: 92px; display: grid; gap: 4px; justify-items: start; max-width: 430px; pointer-events: none; }
+  .feed-row { background: var(--panel); border: 1px solid var(--hairline); border-left: 3px solid var(--gold); border-radius: 4px; padding: 4px 10px; font-size: 12.5px; opacity: 0; transform: translateX(-6px); transition: opacity 0.3s, transform 0.3s; }
+  .feed-row.in { opacity: 1; transform: none; }
+  .feed-row.out { opacity: 0; }
+  .feed-row.good { border-left-color: var(--bloom); }
+  .feed-row.bad { border-left-color: var(--danger); }
+  #pulse-cluster { position: fixed; right: 18px; bottom: 18px; width: 218px; background: var(--panel); border: 1px solid var(--hairline); border-radius: 8px; padding: 9px 14px; pointer-events: none; }
+  #pulse-label { font-size: 9.5px; letter-spacing: 0.16em; color: var(--muted); }
+  #pulse-label.ready { color: var(--gold); }
+  #pulse-bar { height: 6px; background: rgba(255,255,255,0.09); border-radius: 3px; margin-top: 5px; overflow: hidden; }
+  #pulse-fill { height: 100%; background: var(--gold); width: 100%; }
+  #hint { position: fixed; left: 18px; bottom: 18px; font-size: 11.5px; color: var(--muted); letter-spacing: 0.04em; pointer-events: none; background: var(--panel); border: 1px solid var(--hairline); border-radius: 8px; padding: 8px 12px; }
+  #hint b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- bloom tag / banner / vignette ---------- */
+  #bloom-tag { position: fixed; left: 0; top: 0; font-family: var(--font-readout); font-size: 12px; letter-spacing: 0.12em; color: var(--bloom); background: rgba(6, 20, 10, 0.72); border: 1px solid rgba(141, 255, 158, 0.4); border-radius: 4px; padding: 3px 8px; pointer-events: none; opacity: 0; transition: opacity 0.25s; }
+  #bloom-tag.ready { color: #eaffea; border-color: var(--bloom); }
+  #banner { position: fixed; top: 21%; left: 0; right: 0; text-align: center; pointer-events: none; opacity: 0; transform: translateY(6px); transition: opacity 0.35s, transform 0.35s; }
+  #banner.show { opacity: 1; transform: none; }
+  #banner-title { font-size: 30px; font-weight: 700; letter-spacing: 0.3em; text-shadow: 0 3px 22px rgba(0,0,0,0.9); }
+  #banner-sub { margin-top: 6px; font-size: 12px; letter-spacing: 0.26em; color: var(--gold-soft); }
+  #vignette { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, transparent 52%, rgba(190, 20, 10, 0.5) 100%); opacity: 0; transition: opacity 0.12s; }
+  #vignette.hit { opacity: 1; }
+  body.lowhp #vignette { opacity: 0.55; animation: lowhp-pulse 1.1s ease-in-out infinite alternate; }
+  @keyframes lowhp-pulse { from { opacity: 0.3; } to { opacity: 0.65; } }
+
+  /* ---------- screens ---------- */
+  .screen { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; text-align: center; background: radial-gradient(ellipse at center, rgba(4, 6, 14, 0.25) 30%, rgba(4, 6, 14, 0.78) 100%); padding: 24px; }
+  .screen.show { display: flex; }
+  .screen h1 { font-size: 64px; margin: 0; letter-spacing: 0.34em; font-weight: 800; color: var(--gold-soft); text-shadow: 0 0 34px rgba(255, 180, 60, 0.45), 0 4px 30px rgba(0,0,0,0.9); padding-left: 0.34em; }
+  .screen h2 { font-size: 30px; margin: 0; letter-spacing: 0.26em; font-weight: 700; }
+  .pitch { margin-top: 12px; font-size: 17px; color: var(--ink); letter-spacing: 0.06em; }
+  .fiction { margin-top: 12px; max-width: 560px; font-size: 13.5px; line-height: 1.65; color: var(--muted); }
+  .controls { margin-top: 20px; display: grid; grid-template-columns: auto auto; gap: 5px 18px; font-size: 13px; color: var(--muted); text-align: left; }
+  .controls b { color: var(--gold-soft); font-family: var(--font-readout); font-weight: 600; text-align: right; }
+  .big-btn { margin-top: 28px; pointer-events: auto; cursor: pointer; background: linear-gradient(180deg, #ffcf6e, #f0a832); color: #241300; border: none; border-radius: 8px; font-family: var(--font-ui); font-size: 16px; font-weight: 800; letter-spacing: 0.22em; padding: 14px 42px 14px calc(42px + 0.22em); box-shadow: 0 6px 30px rgba(255, 170, 50, 0.35); }
+  .big-btn:hover { filter: brightness(1.08); }
+  #final-score { font-family: var(--font-readout); font-size: 54px; color: var(--gold-soft); margin-top: 10px; }
+  #over-stats { margin-top: 10px; font-size: 13.5px; color: var(--muted); letter-spacing: 0.05em; }
+  #cards { margin-top: 24px; display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+  .card { pointer-events: auto; cursor: pointer; width: 232px; text-align: left; background: var(--panel); border: 1px solid rgba(255, 196, 77, 0.4); border-radius: 10px; padding: 16px; color: var(--ink); font-family: var(--font-ui); display: grid; gap: 7px; }
+  .card:hover { border-color: var(--gold); background: rgba(24, 20, 8, 0.9); transform: translateY(-2px); }
+  .card-key { font-family: var(--font-readout); font-size: 11px; color: var(--muted); border: 1px solid var(--hairline); border-radius: 4px; width: 20px; height: 20px; display: grid; place-items: center; }
+  .card-name { font-size: 16.5px; font-weight: 700; color: var(--gold-soft); letter-spacing: 0.04em; }
+  .card-desc { font-size: 12.5px; line-height: 1.55; color: var(--muted); }
+  #screen-pause { background: rgba(4, 6, 14, 0.55); }
+</style>
+</head>
+<body>
+<canvas id="game" aria-label="LURELIGHT: steer the shepherd drone with WASD, lead the mote swarm with the mouse, pulse with click or space"></canvas>
+<p id="status" role="status" aria-live="polite"></p>
+
+<div id="topbar">
+  <div class="cluster">
+    <div class="label"><span>HULL — PILGRIM-9</span><b id="hull-num">100 / 100</b></div>
+    <div id="hull-bar"><div id="hull-fill"></div></div>
+    <div id="swarm-line">SWARM — YOUR ONLY WEAPON<b id="swarm-num">42</b></div>
+  </div>
+  <div class="cluster" id="centre-cluster">
+    <div id="wave-label">WAVE 1</div>
+    <div id="boss-wrap">
+      <div class="label">THE UNDERSHEPHERD</div>
+      <div id="boss-bar"><div id="boss-fill"></div></div>
+    </div>
+  </div>
+  <div class="cluster" id="score-cluster">
+    <div class="label" style="justify-content:flex-end"><span>SCORE</span></div>
+    <div id="score-num">0</div>
+    <div id="combo-wrap"><span id="combo-mult">×1</span> <span style="font-size:10px; letter-spacing:0.14em; color:var(--muted)">CHAIN</span>
+      <div id="combo-bar"><div id="combo-fill"></div></div>
+    </div>
+  </div>
+</div>
+
+<div id="feed"></div>
+<div id="hint"><b>WASD</b> steer · <b>MOUSE</b> lead the swarm · <b>CLICK / SPACE</b> pulse · <b>P</b> pause</div>
+<div id="pulse-cluster">
+  <div id="pulse-label">PULSE READY — CLICK / SPACE</div>
+  <div id="pulse-bar"><div id="pulse-fill"></div></div>
+</div>
+
+<div id="bloom-tag">BLOOM 0/13</div>
+<div id="banner"><div id="banner-title"></div><div id="banner-sub"></div></div>
+<div id="vignette"></div>
+
+<div class="screen" id="screen-title">
+  <h1>LURELIGHT</h1>
+  <div class="pitch">You are the shepherd; the swarm is your only weapon.</div>
+  <p class="fiction">Pilgrim-9 is a lure-drone with no gun. What it has is a river of forty-two
+  living motes of light that follow its signal — and the Hollow, dark things with red eyes,
+  are coming over the rim of the Shepherd's Ring to eat that light, mote by mote.
+  Lead the river onto them and they burn. Let it thin, and they feed.
+  Thread the swarm through each bloom to grow it. Hold the light as long as you can.</p>
+  <div class="controls">
+    <b>W A S D</b><span>steer the shepherd</span>
+    <b>MOUSE</b><span>place the lure — the swarm streams to it</span>
+    <b>CLICK / SPACE</b><span>pulse: throw the Hollow back, briefly stunned</span>
+    <b>1 · 2 · 3</b><span>choose an overclock between waves</span>
+    <b>P</b><span>pause</span>
+  </div>
+  <button class="big-btn" id="start-btn">BEGIN THE VIGIL</button>
+</div>
+
+<div class="screen" id="screen-upgrade">
+  <h2>WAVE CLEARED</h2>
+  <div class="pitch">Choose an overclock — the dark is already gathering.</div>
+  <div id="cards"></div>
+</div>
+
+<div class="screen" id="screen-over">
+  <h2>THE LIGHT GOES OUT</h2>
+  <div id="final-score">0</div>
+  <div id="over-stats"></div>
+  <button class="big-btn" id="restart-btn">LIGHT IT AGAIN</button>
+</div>
+
+<div class="screen" id="screen-pause">
+  <h2>PAUSED</h2>
+  <div class="pitch">The river holds its breath. P to resume.</div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three/three.module.min.js"
+  }
+}
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
