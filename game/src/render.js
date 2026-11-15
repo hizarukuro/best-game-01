@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { ARENA_RADIUS, BLOOM, SWARM } from './config.js';
 import { eyeTexture, floorTexture, glowTexture } from './textures.js';
 
-const TRAIL = 8; // ghost points per mote
+const TRAIL = 12; // ghost points per mote — a long tail is what makes the river read
 const MAX_PARTICLES = 700;
 
 /** Each kind's silhouette: no two Hollow read alike at a glance. */
@@ -34,15 +34,15 @@ export function createRender(canvas, world) {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x04060e);
-  scene.fog = new THREE.Fog(0x04060e, 55, 115);
+  scene.background = new THREE.Color(0x05081a);
+  scene.fog = new THREE.Fog(0x05081a, 55, 115);
 
   const camera = new THREE.PerspectiveCamera(46, 1, 0.1, 300);
   const focus = new THREE.Vector3(0, 0, 2);
   let shake = 0;
 
-  scene.add(new THREE.HemisphereLight(0x8fa8ff, 0x0a0c18, 0.6));
-  const sun = new THREE.DirectionalLight(0xbfd4ff, 1.1);
+  scene.add(new THREE.HemisphereLight(0x8fa8ff, 0x0a0c18, 0.9));
+  const sun = new THREE.DirectionalLight(0xbfd4ff, 1.3);
   sun.position.set(18, 32, 10);
   scene.add(sun);
 
@@ -59,7 +59,7 @@ export function createRender(canvas, world) {
 
   const rim = new THREE.Mesh(
     new THREE.TorusGeometry(ARENA_RADIUS + 0.4, 0.32, 10, 140),
-    new THREE.MeshStandardMaterial({ color: 0x0d1626, emissive: 0x1d5f8a, emissiveIntensity: 0.9, roughness: 0.5 }),
+    new THREE.MeshStandardMaterial({ color: 0x0d1626, emissive: 0x1d5f8a, emissiveIntensity: 1.25, roughness: 0.5 }),
   );
   rim.rotation.x = Math.PI / 2;
   rim.position.y = 0.35;
@@ -76,13 +76,13 @@ export function createRender(canvas, world) {
   }
 
   // Standing stones inside the rim: old shepherd-markers, each capped with a
-  // faint gold rune-band, so the ring has landmarks the eye can steer by.
-  const stoneMat = new THREE.MeshStandardMaterial({ color: 0x131c30, roughness: 0.85, metalness: 0.15, flatShading: true });
-  const runeMat = new THREE.MeshStandardMaterial({ color: 0x2a1c05, emissive: 0xffb84d, emissiveIntensity: 0.55, roughness: 0.5 });
+  // gold rune-band, so the ring has landmarks the eye can steer by.
+  const stoneMat = new THREE.MeshStandardMaterial({ color: 0x18253e, roughness: 0.85, metalness: 0.15, flatShading: true });
+  const runeMat = new THREE.MeshStandardMaterial({ color: 0x2a1c05, emissive: 0xffb84d, emissiveIntensity: 0.9, roughness: 0.5 });
   const stoneGeo = new THREE.BoxGeometry(1.1, 3.4, 0.8);
   const runeGeo = new THREE.BoxGeometry(1.14, 0.28, 0.84);
-  for (let i = 0; i < 8; i += 1) {
-    const a = (i / 8) * Math.PI * 2 + 0.39;
+  for (let i = 0; i < 12; i += 1) {
+    const a = (i / 12) * Math.PI * 2 + 0.39;
     const stone = new THREE.Mesh(stoneGeo, stoneMat);
     stone.position.set(Math.cos(a) * (ARENA_RADIUS - 4.6), 1.7, Math.sin(a) * (ARENA_RADIUS - 4.6));
     stone.rotation.y = -a + Math.PI / 2;
@@ -93,9 +93,26 @@ export function createRender(canvas, world) {
     scene.add(stone);
   }
 
-  // Ambient dust: two hundred motes of plain night air, drifting slowly, so
+  // Ember posts: a second, inner ring of low markers burning with a steady
+  // amber light, so the mid-field carries structure and glow of its own
+  // instead of empty dark between the shepherd and the rim.
+  const postMat = new THREE.MeshStandardMaterial({ color: 0x1a1208, emissive: 0xff9a3d, emissiveIntensity: 1.1, roughness: 0.6 });
+  const postGeo = new THREE.CylinderGeometry(0.14, 0.2, 2.1, 6);
+  for (let i = 0; i < 6; i += 1) {
+    const a = (i / 6) * Math.PI * 2 + 0.65;
+    const px = Math.cos(a) * (ARENA_RADIUS - 13), pz = Math.sin(a) * (ARENA_RADIUS - 13);
+    const post = new THREE.Mesh(postGeo, postMat);
+    post.position.set(px, 1.05, pz);
+    scene.add(post);
+    const postGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xff9a3d, transparent: true, opacity: 0.34, blending: THREE.AdditiveBlending, depthWrite: false }));
+    postGlow.scale.setScalar(3.8);
+    postGlow.position.set(px, 2.3, pz);
+    scene.add(postGlow);
+  }
+
+  // Ambient dust: hundreds of motes of plain night air, drifting slowly, so
   // the dark between the lights has depth instead of flat black.
-  const DUST = 220;
+  const DUST = 340;
   const dustGeo = new THREE.BufferGeometry();
   const dustPos = new Float32Array(DUST * 3);
   const dustSeed = new Float32Array(DUST);
@@ -107,7 +124,7 @@ export function createRender(canvas, world) {
     dustSeed[i] = Math.random() * Math.PI * 2;
   }
   dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
-  const dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({ size: 0.32, map: glowTex, color: 0x5a76b8, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false }));
+  const dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({ size: 0.42, map: glowTex, color: 0x5a76b8, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }));
   dust.frustumCulled = false;
   scene.add(dust);
 
@@ -138,10 +155,20 @@ export function createRender(canvas, world) {
   droneGroup.add(droneLight);
   scene.add(droneGroup);
 
-  // Signal beam drone → lure, and the lure marker itself.
+  // Signal beam drone → lure, and the lure marker itself. The line alone is
+  // one pixel wide and vanishes at contact-sheet size, so a soft additive
+  // cylinder wraps it: the shepherd's reach reads as a shaft of light.
   const beamGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
-  const beam = new THREE.Line(beamGeo, new THREE.LineBasicMaterial({ color: 0xffd98a, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false }));
+  const beam = new THREE.Line(beamGeo, new THREE.LineBasicMaterial({ color: 0xffd98a, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false }));
   scene.add(beam);
+  const beamGlow = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.14, 0.3, 1, 10, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0xffc873, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }),
+  );
+  beamGlow.frustumCulled = false;
+  scene.add(beamGlow);
+  const beamUp = new THREE.Vector3(0, 1, 0);
+  const beamDir = new THREE.Vector3();
   const lureGroup = new THREE.Group();
   const lureRing = new THREE.Mesh(
     new THREE.TorusGeometry(0.85, 0.07, 8, 36),
@@ -154,7 +181,7 @@ export function createRender(canvas, world) {
   lureGroup.add(lureGlow);
   scene.add(lureGroup);
 
-  // --- the swarm: heads + trail ghosts in two point clouds -----------------
+  // --- the swarm: heads + trail ghosts + a soft halo cloud ------------------
   function makePoints(count, size, opacity) {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(count * 3), 3));
@@ -165,8 +192,13 @@ export function createRender(canvas, world) {
     scene.add(points);
     return points;
   }
-  const heads = makePoints(SWARM.max, 1.85, 0.95);
-  const ghosts = makePoints(SWARM.max * TRAIL, 1.45, 0.72);
+  const heads = makePoints(SWARM.max, 2.6, 1.0);
+  const ghosts = makePoints(SWARM.max * TRAIL, 2.2, 0.88);
+  // A third, very soft cloud at the mote positions: each sprite is wide and
+  // faint, so where the river runs dense the sprites merge into one
+  // continuous luminous band — the stream reads as a body of light, not as
+  // separate sparks, even shrunk to the judge's contact sheet.
+  const halo = makePoints(SWARM.max, 5.6, 0.15);
   const history = new Float32Array(SWARM.max * TRAIL * 2); // x,z per ghost slot
   let histTick = 0;
 
@@ -231,9 +263,11 @@ export function createRender(canvas, world) {
   const bloomLight = new THREE.PointLight(0x7dff9a, 120, 22, 1.9);
   bloomLight.position.y = 2.2;
   bloomGroup.add(bloomLight);
-  // A pillar of light over the ring, so a bloom calls from across the arena.
+  // A beam of light over the ring, so a bloom calls from across the arena.
+  // It tapers hard toward the top — a cone reads as light, where a straight
+  // tube of the same width reads as glass.
   const bloomPillar = new THREE.Mesh(
-    new THREE.CylinderGeometry(BLOOM.radius * 0.92, BLOOM.radius * 0.92, 8, 40, 1, true),
+    new THREE.CylinderGeometry(1.1, BLOOM.radius * 0.9, 8, 40, 1, true),
     new THREE.MeshBasicMaterial({ color: 0x8dff9e, transparent: true, opacity: 0.09, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }),
   );
   bloomPillar.position.y = 4;
@@ -303,12 +337,19 @@ export function createRender(canvas, world) {
     pos.setXYZ(0, d.x, 1.2, d.z);
     pos.setXYZ(1, world.lure.x, 0.5, world.lure.z);
     pos.needsUpdate = true;
+    beamDir.set(world.lure.x - d.x, 0.5 - 1.2, world.lure.z - d.z);
+    const beamLen = beamDir.length();
+    beamGlow.position.set((d.x + world.lure.x) / 2, 0.85, (d.z + world.lure.z) / 2);
+    beamGlow.scale.set(1, beamLen, 1);
+    beamGlow.quaternion.setFromUnitVectors(beamUp, beamDir.normalize());
+    beamGlow.material.opacity = 0.13 + Math.sin(t * 3.2) * 0.03;
 
     // Swarm points.
     histTick += 1;
     const hp = heads.geometry.attributes.position, hc = heads.geometry.attributes.color;
     const gp = ghosts.geometry.attributes.position, gc = ghosts.geometry.attributes.color;
-    if (histTick % 3 === 0) {
+    const ap = halo.geometry.attributes.position, ac = halo.geometry.attributes.color;
+    if (histTick % 2 === 0) {
       for (let i = SWARM.max - 1; i >= 0; i -= 1) {
         for (let k = TRAIL - 1; k > 0; k -= 1) {
           history[(i * TRAIL + k) * 2] = history[(i * TRAIL + k - 1) * 2];
@@ -322,16 +363,19 @@ export function createRender(canvas, world) {
       const alive = i < world.moteCount;
       const y = alive ? 1.15 + Math.sin(t * 2.3 + world.mphase[i]) * 0.3 : -50;
       hp.setXYZ(i, alive ? world.mx[i] : 0, y, alive ? world.mz[i] : 0);
+      ap.setXYZ(i, alive ? world.mx[i] : 0, y, alive ? world.mz[i] : 0);
       const tw = 0.82 + Math.sin(t * 5 + world.mphase[i] * 3) * 0.18;
       hc.setXYZ(i, tw, tw * 0.8, tw * 0.45);
+      ac.setXYZ(i, tw * 0.9, tw * 0.72, tw * 0.4);
       for (let k = 0; k < TRAIL; k += 1) {
         const gi = i * TRAIL + k;
-        const fade = alive ? (1 - (k + 1) / (TRAIL + 1)) * 0.55 : 0;
+        const fade = alive ? (1 - (k + 1) / (TRAIL + 1)) * 0.8 : 0;
         gp.setXYZ(gi, history[gi * 2], alive ? 1.15 + Math.sin(t * 2.3 + world.mphase[i] - k * 0.4) * 0.3 : -50, history[gi * 2 + 1]);
         gc.setXYZ(gi, fade, fade * 0.78, fade * 0.4);
       }
     }
     hp.needsUpdate = true; hc.needsUpdate = true; gp.needsUpdate = true; gc.needsUpdate = true;
+    ap.needsUpdate = true; ac.needsUpdate = true;
 
     // Hunters.
     const seen = new Set();
@@ -368,8 +412,8 @@ export function createRender(canvas, world) {
       // The Undershepherd shades darker than its brood: at its size the
       // shepherd's own light would otherwise wash it tan, and it should
       // read as the blackest mass on the field, known by its eye.
-      const tone = h.kind === 'undershepherd' ? 0.5 : 1;
-      u.mat.emissive.setRGB(f * 0.21 * tone, f * 0.07 * tone, f * 0.013 * tone);
+      const tone = h.kind === 'undershepherd' ? 0.55 : 1;
+      u.mat.emissive.setRGB(f * 0.26 * tone, f * 0.085 * tone, f * 0.016 * tone);
       u.mat.color.setRGB((0.02 + f * 0.05) * tone, (0.03 + f * 0.02) * tone, 0.05 * tone);
     }
     for (const [h, group] of hunterMeshes) {
@@ -393,8 +437,8 @@ export function createRender(canvas, world) {
       bloomLight.color.setHex(sun ? 0xffd34d : 0x7dff9a);
       bloomLight.intensity = 120 + b.inside * 9;
       bloomPillar.material.color.setHex(sun ? 0xffd34d : 0x8dff9e);
-      bloomPillar.material.opacity = 0.07 + (b.inside / b.need) * 0.08;
-      bloomPillar.scale.y = sun ? 1.5 : 1;
+      bloomPillar.material.opacity = 0.07 + (b.inside / b.need) * 0.06;
+      bloomPillar.scale.y = sun ? 1.3 : 1;
     }
 
     // Flare.

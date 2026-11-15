@@ -81,9 +81,10 @@ export function createStaging(name, world, seed) {
     // judged by. Real systems only, staged the way a real run reaches them:
     // four overclocks fitted across nine cleared waves (the real apply
     // functions, so the loadout panel and the sim agree), the Undershepherd
-    // on the field with its escort, a sunbloom open across the ring, and the
-    // shepherd kiting the boss with the whole river wrapped around it —
-    // the one way the boss burns at all.
+    // on the field with its escort, a sunbloom open on the fight's flank
+    // with the river already spilling into it, two escorts alight at the
+    // river's edge, and the shepherd kiting the boss with the whole river
+    // wrapped around it — the one way the boss burns at all.
     const fit = (id) => {
       const u = UPGRADES.find((x) => x.id === id);
       u.apply(world);
@@ -100,15 +101,21 @@ export function createStaging(name, world, seed) {
     world.harvested = 11;
     world.combo.chain = 17; world.combo.t = 3; world.combo.mult = 1 + 17 * 0.25;
     world.spawnAt('undershepherd', 11, -7);
-    world.spawnAt('maw', -10, 6);
+    world.spawnAt('maw', 2, -16);
     world.spawnAt('wailer', 15, 9);
     world.spawnAt('charger', -15, -9);
     world.spawnAt('stalker', 4, 14);
-    world.spawnAt('mite', 8, 10);
+    world.spawnAt('mite', 12, -16);
+    // The sunbloom opens on the fight's southern flank, close enough that
+    // the river wrapped around the boss spills into its ring — a harvest
+    // genuinely in progress inside the frame, not a decoration across the
+    // arena. The maw and the mite are placed on the same flank: the maw
+    // walks into the river's edge to feed, the mite crosses the stream
+    // chasing the shepherd, so both are burning when the frame freezes.
     world.bloom.active = true;
     world.bloom.kind = 'sun';
     world.bloom.need = SUNBLOOM.need;
-    world.bloom.x = -13; world.bloom.z = -12;
+    world.bloom.x = 11; world.bloom.z = -11;
     world.bloom.lifeMax = SUNBLOOM.life; world.bloom.lifeT = 17;
     // Shepherd the boss: hold ~11 units off it and circle, with the lure
     // set on the boss's near shoulder — so the river streams out behind the
@@ -116,12 +123,25 @@ export function createStaging(name, world, seed) {
     // of vanishing into a knot inside the boss's silhouette. One pulse
     // mid-scene so the ring is still in the air when the frame freezes.
     let n = 0;
+    let ripe = false;
     return {
       input: () => {
         n += 1;
         const d = world.drone;
         const boss = world.hunters.find((h) => h.kind === 'undershepherd') ?? nearestHunter(world, d.x, d.z);
         if (!boss) return autopilot(world);
+        // The freeze waits for the frame the cover needs: the boss held by
+        // the river, the sunbloom part-filled (a harvest in progress, not
+        // yet complete), and at least two escorts properly alight at once.
+        // All of it is read off the live sim, so the frozen frame is a real
+        // moment — in practice the maw and mite reach full burn beside the
+        // boss while the ring is part-filled, around step 66.
+        if (n >= 60 && !ripe) {
+          const burning = world.hunters.filter((h) => h !== boss && h.flash > 0.4).length;
+          ripe = boss.ring >= 40
+            && world.bloom.active && world.bloom.inside >= 9 && world.bloom.inside < world.bloom.need
+            && burning >= 2;
+        }
         const dx = d.x - boss.x, dz = d.z - boss.z;
         const dist = Math.max(1, Math.hypot(dx, dz));
         const radial = (11 - dist) * 0.22;
@@ -135,9 +155,10 @@ export function createStaging(name, world, seed) {
           pulse: n === 132 && d.pulseT <= 0,
         };
       },
-      // 170 steps ≈ 2.8 s: inside the combo's 3 s window, so the staged
-      // chain is still alive — and still paying — in the frozen frame.
-      get done() { steps += 1; return steps > 170; },
+      // The ripe check above usually lands the frame near the old 170; the
+      // hard cap of 175 steps ≈ 2.9 s stays inside the combo's 3 s window,
+      // so the staged chain is still alive — and still paying — either way.
+      get done() { steps += 1; return ripe || steps > 175; },
     };
   }
 

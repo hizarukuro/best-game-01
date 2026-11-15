@@ -47,20 +47,20 @@ export function floorTexture() {
   const c = document.createElement('canvas');
   c.width = c.height = S;
   const g = c.getContext('2d');
-  g.fillStyle = '#081020';
+  g.fillStyle = '#0a1729';
   g.fillRect(0, 0, S, S);
 
   // A breath of light at the centre, so the middle of the ring never reads
   // as flat black when the whole frame shrinks to a contact sheet.
   const heart = g.createRadialGradient(S / 2, S / 2, 10, S / 2, S / 2, S * 0.52);
-  heart.addColorStop(0, 'rgba(64,96,170,0.20)');
-  heart.addColorStop(0.6, 'rgba(40,64,120,0.10)');
+  heart.addColorStop(0, 'rgba(64,96,170,0.30)');
+  heart.addColorStop(0.6, 'rgba(40,64,120,0.17)');
   heart.addColorStop(1, 'rgba(0,0,0,0)');
   g.fillStyle = heart;
   g.fillRect(0, 0, S, S);
 
   // Panel grid.
-  g.strokeStyle = 'rgba(70,110,180,0.16)';
+  g.strokeStyle = 'rgba(70,110,180,0.22)';
   g.lineWidth = 1;
   for (let i = 0; i <= 16; i += 1) {
     const p = (i / 16) * S;
@@ -69,12 +69,12 @@ export function floorTexture() {
   }
   // Scattered plating wear.
   for (let i = 0; i < 260; i += 1) {
-    g.fillStyle = `rgba(120,160,220,${0.03 + Math.random() * 0.05})`;
+    g.fillStyle = `rgba(120,160,220,${0.04 + Math.random() * 0.06})`;
     g.fillRect(Math.random() * S, Math.random() * S, 2 + Math.random() * 8, 1 + Math.random() * 3);
   }
   const cx = S / 2, cy = S / 2;
   // Radial spokes from the centre to each gate: the ring's steering marks.
-  g.strokeStyle = 'rgba(96,160,255,0.13)';
+  g.strokeStyle = 'rgba(96,160,255,0.20)';
   g.lineWidth = 2;
   for (let i = 0; i < 12; i += 1) {
     const a = (i / 12) * Math.PI * 2;
@@ -84,13 +84,20 @@ export function floorTexture() {
     g.stroke();
   }
   // Range rings.
-  for (const [r, a] of [[0.32, 0.34], [0.58, 0.27], [0.84, 0.36]]) {
+  for (const [r, a] of [[0.32, 0.42], [0.58, 0.34], [0.84, 0.44]]) {
     g.strokeStyle = `rgba(96,180,255,${a})`;
     g.lineWidth = 3;
     g.beginPath(); g.arc(cx, cy, r * S * 0.5, 0, Math.PI * 2); g.stroke();
   }
+  // A dashed gold circle under the standing stones' ring: the shepherds'
+  // old patrol path, worn into the plating.
+  g.strokeStyle = 'rgba(255,184,77,0.10)';
+  g.lineWidth = 10;
+  g.setLineDash([26, 18]);
+  g.beginPath(); g.arc(cx, cy, S * 0.384, 0, Math.PI * 2); g.stroke();
+  g.setLineDash([]);
   // Gate ticks at the rim (the Hollow enter here).
-  g.strokeStyle = 'rgba(255,90,70,0.5)';
+  g.strokeStyle = 'rgba(255,90,70,0.6)';
   g.lineWidth = 6;
   for (let i = 0; i < 12; i += 1) {
     const a = (i / 12) * Math.PI * 2;
@@ -100,12 +107,12 @@ export function floorTexture() {
     g.stroke();
   }
   // Painted name under the centre.
-  g.fillStyle = 'rgba(150,200,255,0.22)';
+  g.fillStyle = 'rgba(150,200,255,0.30)';
   g.font = '700 44px system-ui, sans-serif';
   g.textAlign = 'center';
   g.fillText("SHEPHERD'S RING", cx, cy + 118);
   g.font = '600 21px system-ui, sans-serif';
-  g.fillStyle = 'rgba(150,200,255,0.17)';
+  g.fillStyle = 'rgba(150,200,255,0.24)';
   g.fillText('KEEP THE LIGHT MOVING', cx, cy + 148);
 
   const tex = new THREE.CanvasTexture(c);
